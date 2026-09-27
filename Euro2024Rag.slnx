@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Euro2024Rag.Web/Euro2024Rag.Web.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,37 @@
+{
+  "$comment": "Supplementary facts that the Kaggle CSV does not contain. Match numbers are 1-based row positions in Euro_2024_Matches.csv, which is ordered chronologically.",
+  "stages": [
+    { "name": "Group stage", "firstMatch": 1, "lastMatch": 36 },
+    { "name": "Round of 16", "firstMatch": 37, "lastMatch": 44 },
+    { "name": "Quarter-final", "firstMatch": 45, "lastMatch": 48 },
+    { "name": "Semi-final", "firstMatch": 49, "lastMatch": 50 },
+    { "name": "Final", "firstMatch": 51, "lastMatch": 51 }
+  ],
+  "groups": {
+    "A": [ "Germany", "Scotland", "Hungary", "Switzerland" ],
+    "B": [ "Spain", "Croatia", "Italy", "Albania" ],
+    "C": [ "Slovenia", "Denmark", "Serbia", "England" ],
+    "D": [ "Poland", "Netherlands", "Austria", "France" ],
+    "E": [ "Belgium", "Slovakia", "Romania", "Ukraine" ],
+    "F": [ "Turkiye", "Georgia", "Portugal", "Czechia" ]
+  },
+  "stadiums": {
+    "Fuball Arena Mnchen": { "name": "Fußball Arena München", "city": "Munich" },
+    "Dsseldorf Arena": { "name": "Düsseldorf Arena", "city": "Düsseldorf" },
+    "Cologne Stadium": { "name": "Cologne Stadium", "city": "Cologne" },
+    "Olympiastadion Berlin": { "name": "Olympiastadion Berlin", "city": "Berlin" },
+    "BVB Stadion Dortmund": { "name": "BVB Stadion Dortmund", "city": "Dortmund" },
+    "Volksparkstadion": { "name": "Volksparkstadion", "city": "Hamburg" },
+    "Stuttgart Arena": { "name": "Stuttgart Arena", "city": "Stuttgart" },
+    "Arena AufSchalke": { "name": "Arena AufSchalke", "city": "Gelsenkirchen" },
+    "Frankfurt Arena": { "name": "Frankfurt Arena", "city": "Frankfurt" },
+    "Leipzig Stadium": { "name": "Leipzig Stadium", "city": "Leipzig" }
+  },
+  "knockoutDetails": {
+    "39": { "extraTime": true },
+    "42": { "extraTime": true, "penaltyWinner": "Portugal", "penaltyScore": "3-0" },
+    "45": { "extraTime": true },
+    "46": { "extraTime": true, "penaltyWinner": "France", "penaltyScore": "5-3" },
+    "47": { "extraTime": true, "penaltyWinner": "England", "penaltyScore": "5-3" }
+  }
+}

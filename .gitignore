@@ -1,0 +1,21 @@
+# Build
+bin/
+obj/
+*.user
+.vs/
+.idea/
+.vscode/
+TestResults/
+.DS_Store
+tests/
+
+# Secrets: the Gemini API key lives here (copy appsettings.Development.example.json)
+appsettings.Development.json
+appsettings.*.local.json
+
+# Embedding cache (regenerated on first run)
+App_Data/
+
+# Local tooling
+.claude/
+.github/
