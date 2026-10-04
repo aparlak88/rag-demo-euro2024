@@ -1,14 +1,13 @@
 using System.Text.Json;
-using CommunityToolkit.VectorData.InMemory;
 using Euro2024Rag.Web.Configuration;
 using Euro2024Rag.Web.Ingestion;
 using Euro2024Rag.Web.Rag;
 using Euro2024Rag.Web.Resilience;
+using Euro2024Rag.Web.VectorStores;
 using Google.GenAI;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.VectorData;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,9 +33,8 @@ builder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp 
         sp.GetRequiredService<ILogger<RetryingEmbeddingGenerator>>());
 });
 
-// --- Vector store: in-memory, rebuilt at startup ----------------------------------------------
-builder.Services.AddSingleton<VectorStore>(_ => new InMemoryVectorStore());
-builder.Services.AddSingleton(sp => sp.GetRequiredService<VectorStore>().GetCollection<string, KnowledgeChunk>("euro2024"));
+// --- Vector store: InMemory, PgVector, Qdrant or Chroma, chosen by VectorStore:Provider -------------
+builder.Services.AddKnowledgeVectorStore(builder.Configuration);
 
 // --- RAG ----------------------------------------------------------------------------------------
 builder.Services.AddSingleton<IngestionState>();
@@ -50,9 +48,10 @@ app.UseStaticFiles();
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/status", (IngestionState state, IOptions<GeminiOptions> gemini) => new
+api.MapGet("/status", (IngestionState state, IOptions<GeminiOptions> gemini, IOptions<VectorStoreOptions> vectorStore) => new
 {
     ingestion = state.Current,
+    vectorStore = new { provider = vectorStore.Value.Provider.ToString(), collection = vectorStore.Value.CollectionName },
     models = new
     {
         chat = gemini.Value.ChatModels,

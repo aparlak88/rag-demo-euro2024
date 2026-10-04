@@ -1,7 +1,7 @@
 # ⚽ Euro 2024 RAG
 
 A ChatGPT-style assistant that answers questions about **UEFA Euro 2024** using **Retrieval-Augmented Generation**.
-Built with **.NET 10**, **Microsoft.Extensions.AI**, **Google Gemini** (chat + embeddings), the **.NET Community Toolkit in-memory vector store**, **Polly** and a small **jQuery** front end.
+Built with **.NET 10**, **Microsoft.Extensions.AI**, **Google Gemini** (chat + embeddings), a **pluggable vector store** (**PostgreSQL + pgvector**, **Qdrant**, **Chroma** or in-memory, chosen in configuration), **Polly** and a small **jQuery** front end.
 
 > Ask *"Who won Euro 2024 and how did they get there?"*, *"Türkiye turnuvada nasıl bir performans gösterdi?"* or *"Which team over-performed its xG the most?"*. The app retrieves the relevant documents, shows them with similarity scores, and streams an answer that cites them.
 
@@ -14,6 +14,7 @@ Built with **.NET 10**, **Microsoft.Extensions.AI**, **Google Gemini** (chat + e
 - **Citations**: every answer cites its sources as `[n]`; click a citation to open the source and see its similarity score.
 - **Model fallback chain with Polly**: `gemini-3.8-flash` → `gemini-3.5-flash` → `gemini-3.7-flash` → `gemini-3.6-flash`, with retries, timeouts, daily-quota detection and a streaming-aware fallback.
 - **Embedding cache on disk**: restarts don't re-embed unchanged documents.
+- **Config-driven vector database**: `VectorStore:Provider` = `InMemory`, `PgVector`, `Qdrant` or `Chroma`. pgvector and Qdrant use the .NET Community Toolkit providers; Chroma has no `Microsoft.Extensions.VectorData` provider, so the repo includes a small one over Chroma's REST API.
 - **Provider-agnostic core**: the RAG code only depends on `IChatClient`, `IEmbeddingGenerator` and `VectorStoreCollection`, so Gemini or the vector store can be swapped without touching it.
 - [ ]  Architecture
 
@@ -26,7 +27,7 @@ flowchart LR
         Builder --> Cache{Embedding<br/>cache hit?}
         Cache -- no --> Embed[Gemini embeddings<br/>RETRIEVAL_DOCUMENT, 768d]
         Cache -- yes --> Store
-        Embed --> Store[(In-memory<br/>vector store)]
+        Embed --> Store[(Vector store<br/>pgvector · Qdrant · Chroma · in-memory)]
     end
 
     subgraph Query["Answering a question"]
@@ -66,7 +67,7 @@ Each chunk is written in natural language, with a descriptive first sentence ("U
 
 ### 3. Retrieval
 
-- Store: `CommunityToolkit.VectorData.InMemory`, behind the `Microsoft.Extensions.VectorData` abstractions.
+- Store: any `VectorStoreCollection<Guid, KnowledgeChunk>`; see [Choosing a vector database](#choosing-a-vector-database).
 - Similarity: cosine, top **8**, results below **0.5** are dropped (`Rag:TopK`, `Rag:MinScore`).
 - **Query rewriting** (`Rag:QueryRewrite` = `FollowUps` by default): a follow-up is rewritten into a standalone English query using the conversation. After a question about Turkiye, *"Peki elendikleri maçta rakibe göre xG'leri nasıldı?"* becomes *"Turkiye vs Netherlands quarter final match xG stats Euro 2024"*. A first question is searched as-is: Gemini embeddings are multilingual, so the Turkish *"Türkiye turnuvada nasıl bir performans gösterdi?"* already retrieves the Turkiye team summary, all five Turkiye matches and the Group F table. Rewriting runs on its own Flash-Lite chain (`Gemini:RewriteModels`), which is faster and, on the free tier, uses its own quota. If the rewrite fails, the raw question is used.
 - `GET /api/search?q=...` returns the raw retrieval results, which helps when tuning chunking.
@@ -84,6 +85,50 @@ The model gets a system prompt that restricts it to the numbered sources, asks f
 ```
 
 If the stream breaks after text has been sent, the answer is regenerated once: the server sends `{"type":"reset"}` and the browser discards the partial text.
+
+## Choosing a vector database
+
+`RagService` and `IngestionService` only see `VectorStoreCollection<Guid, KnowledgeChunk>` from `Microsoft.Extensions.VectorData`. `VectorStores/VectorStoreServiceCollectionExtensions.cs` is the one place that knows the concrete databases; it reads `VectorStore:Provider` and creates the matching collection:
+
+| `VectorStore:Provider` | Implementation                                                 | Storage                              |
+| ---------------------- | -------------------------------------------------------------- | ------------------------------------ |
+| `InMemory` (default)   | `InMemoryCollection` (`CommunityToolkit.VectorData.InMemory`)  | Process memory, rebuilt every start  |
+| `PgVector`             | `PostgresCollection` (`CommunityToolkit.VectorData.PgVector`)  | Table `euro2024`, `vector(768)` column |
+| `Qdrant`               | `QdrantCollection` (`CommunityToolkit.VectorData.Qdrant`)      | Collection `euro2024`, cosine, gRPC  |
+| `Chroma`               | `ChromaKnowledgeCollection` (in this repo, Chroma v2 REST API) | Collection `euro2024`, `hnsw.space = cosine` |
+
+The collection schema comes from the attributes on `KnowledgeChunk` (`[VectorStoreKey]`, `[VectorStoreData]`, `[VectorStoreVector(768, CosineSimilarity)]`), so pgvector and Qdrant create their table / collection and payload indexes from the same class.
+
+Things that differ between the databases, and how the demo handles them:
+
+- **Key type.** Qdrant only accepts `Guid` or `ulong` point ids, so the record key is a `Guid` derived from the readable chunk id (`team-spain` → always the same Guid, `KnowledgeChunk.CreateKey`). Re-indexing therefore overwrites records instead of duplicating them, and the readable id is kept as a data field.
+- **Chroma has no `Microsoft.Extensions.VectorData` provider** (the Semantic Kernel Chroma package only implements the old memory-store API). `ChromaKnowledgeCollection` derives from `VectorStoreCollection<Guid, KnowledgeChunk>` and implements upsert, get, delete, vector search and collection management over HTTP. Filtered search is not implemented: the pipeline doesn't use it. Chroma metadata values must be scalars, so the team list is stored as one `|`-separated string.
+- **Scores.** Chroma returns cosine *distance*; it is converted to similarity (`1 − distance`) so `Rag:MinScore` means the same thing everywhere. pgvector and Qdrant return similarity directly for `DistanceFunction.CosineSimilarity`.
+- **pgvector extension.** The `pgvector/pgvector` image ships the extension but doesn't enable it; `docker/pgvector-init.sql` runs `CREATE EXTENSION vector` on first start. With ~100 rows pgvector does an exact scan; set `IndexKind = IndexKind.Hnsw` on the vector property for an HNSW index on larger data (the in-memory store only supports flat search).
+
+With the same embeddings, all four return the same chunks in the same order with the same scores (to 4 decimals) for the example questions. Indexing still runs at startup for every provider: it reads embeddings from the disk cache and upserts all chunks, which is idempotent thanks to the deterministic keys. Chunks that are removed from the dataset are not deleted from a persistent store; drop the collection (or `docker compose down -v`) after changing the chunking.
+
+### Running with a vector database
+
+`docker-compose.yml` defines the three databases; start the one you want:
+
+```bash
+docker compose up -d qdrant
+```
+
+Then select it, in `appsettings.Development.json` (`"VectorStore": { "Provider": "Qdrant" }`), as an environment variable (`VectorStore__Provider=Qdrant`) or on the command line:
+
+```bash
+dotnet run --project src/Euro2024Rag.Web -- --VectorStore:Provider Qdrant
+```
+
+| Service    | Port                     | Default connection settings                                                              |
+| ---------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| `pgvector` | 5432                     | `Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=euro2024`         |
+| `qdrant`   | 6334 (gRPC), 6333 (REST) | `localhost:6334`; dashboard at http://localhost:6333/dashboard                            |
+| `chroma`   | 8000                     | `http://localhost:8000`, `default_tenant` / `default_database`                           |
+
+`/api/status` reports the active provider, and the UI header shows it. If the database is unreachable, indexing fails with the connection error in the status message and the chat stays disabled.
 
 ## Resilience: model fallback chain with Polly
 
@@ -127,7 +172,7 @@ Data quality issues found and handled in `MatchCsvReader`:
 
 ## Getting started
 
-**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download) and a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download) and a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey). Docker is only needed for pgvector, Qdrant or Chroma.
 
 1. Add your key. The key goes in `appsettings.Development.json`, which is git-ignored:
 
@@ -143,6 +188,8 @@ Data quality issues found and handled in `MatchCsvReader`:
    ```
 3. Open http://localhost:5231. The first start embeds ~106 chunks (a few seconds); later starts load them from the cache.
 
+This uses the in-memory store, which needs no setup. To use pgvector, Qdrant or Chroma, see [Running with a vector database](#running-with-a-vector-database).
+
 ## Configuration
 
 All settings are in `appsettings.json`:
@@ -155,6 +202,11 @@ All settings are in `appsettings.json`:
 | `Gemini:EmbeddingModel`              | `gemini-embedding-001`                                                         | Embedding model (768 dimensions)                          |
 | `Gemini:Resilience:MaxRetryAttempts` | `2`                                                                            | Retries per model for transient errors                    |
 | `Gemini:Resilience:AttemptTimeout`   | `00:00:15`                                                                     | Per attempt; for streaming, time to first visible content |
+| `VectorStore:Provider`               | `InMemory`                                                                     | `InMemory`, `PgVector`, `Qdrant` or `Chroma`              |
+| `VectorStore:CollectionName`         | `euro2024`                                                                     | Table (pgvector) or collection (Qdrant, Chroma) name      |
+| `VectorStore:PgVector:*`             | `ConnectionString`, `Schema`                                                   | Npgsql connection string and schema                       |
+| `VectorStore:Qdrant:*`               | `Host`, `Port` (6334), `Https`, `ApiKey`                                       | Qdrant gRPC endpoint                                      |
+| `VectorStore:Chroma:*`               | `Endpoint`, `Tenant`, `Database`                                               | Chroma server                                             |
 | `Rag:TopK`                           | `8`                                                                            | Chunks retrieved per question                             |
 | `Rag:MinScore`                       | `0.5`                                                                          | Minimum cosine similarity                                 |
 | `Rag:QueryRewrite`                   | `FollowUps`                                                                    | `Off`, `FollowUps` or `Always`                            |
@@ -165,7 +217,7 @@ All settings are in `appsettings.json`:
 
 | Endpoint                      | Description                                                               |
 | ----------------------------- | ------------------------------------------------------------------------- |
-| `GET /api/status`             | Indexing progress, chunk counts, configured models                        |
+| `GET /api/status`             | Indexing progress, chunk counts, configured models, active vector store  |
 | `GET /api/search?q=...&top=8` | Retrieval only: the chunks and scores the model would see                 |
 | `POST /api/chat`              | `{ "messages": [{ "role": "user", "content": "..." }] }` → NDJSON stream |
 
@@ -173,11 +225,12 @@ All settings are in `appsettings.json`:
 
 ```
 src/Euro2024Rag.Web
-├── Configuration/      GeminiOptions, RagOptions, ResilienceOptions
+├── Configuration/      GeminiOptions, RagOptions, ResilienceOptions, VectorStoreOptions
 ├── Data/               Kaggle CSV + tournament-context.json
 ├── Ingestion/          CSV reader, domain model, chunk builder, embedding cache, startup indexing
 ├── Rag/                KnowledgeChunk (vector record), RagService (rewrite → retrieve → generate)
 ├── Resilience/         ResilientChatClient (Polly fallback), RetryingEmbeddingGenerator
+├── VectorStores/       Provider selection (DI), ChromaKnowledgeCollection
 ├── wwwroot/            jQuery chat UI
 └── Program.cs          DI wiring + minimal API endpoints
 ```

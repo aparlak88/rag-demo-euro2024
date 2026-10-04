@@ -6,7 +6,8 @@ namespace Euro2024Rag.Web.Ingestion;
 
 /// <summary>
 /// Disk cache of document embeddings, keyed by a hash of (model, dimensions, text).
-/// The in-memory vector store is rebuilt on every start; this avoids paying for the same embeddings again.
+/// The index is rebuilt on every start (the in-memory store is empty, and switching to another vector store starts
+/// from an empty collection); this avoids paying for the same embeddings again.
 /// Changing a document's text or the embedding model automatically invalidates its entry.
 /// </summary>
 public sealed class EmbeddingCache(string path, string model, int dimensions)

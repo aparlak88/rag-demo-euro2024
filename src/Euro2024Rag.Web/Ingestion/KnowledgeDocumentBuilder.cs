@@ -299,6 +299,7 @@ public static class KnowledgeDocumentBuilder
 
     private static KnowledgeChunk Chunk(string id, string kind, string title, StringBuilder content, params string[] teams) => new()
     {
+        Key = KnowledgeChunk.CreateKey(id),
         Id = id,
         Kind = kind,
         Title = title,

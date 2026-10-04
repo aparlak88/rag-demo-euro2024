@@ -40,9 +40,12 @@ $(function () {
     // Sending is enabled once the server has finished indexing; until then the placeholder says why.
     const placeholder = $input.attr("placeholder");
 
+    const vectorStoreNames = { InMemory: "In-memory vector store", PgVector: "PostgreSQL + pgvector", Qdrant: "Qdrant", Chroma: "Chroma" };
+
     function pollStatus() {
         $.getJSON("/api/status").done(function (s) {
             const ing = s.ingestion;
+            $(".vector-store-name").text(vectorStoreNames[s.vectorStore.provider] || s.vectorStore.provider);
             ready = ing.status === "Ready";
             $input.attr("placeholder", ready ? placeholder : ing.message);
             updateSendState();
