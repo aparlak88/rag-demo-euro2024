@@ -9,7 +9,8 @@ namespace Euro2024Rag.Web.Ingestion;
 
 /// <summary>
 /// Indexing pipeline, run once at startup:
-///   CSV → EuroMatch rows → knowledge chunks → embeddings (cached) → in-memory vector store.
+///   CSV → EuroMatch rows → knowledge chunks → embeddings (cached) → vector store (VectorStore:Provider).
+/// Chunk keys are derived from chunk ids, so with a persistent store a restart overwrites the same records.
 /// </summary>
 public sealed class IngestionService(
     IServiceProvider services,
@@ -80,7 +81,7 @@ public sealed class IngestionService(
                 await cache.SaveAsync(chunks.Select(c => c.Content), stoppingToken);
             }
 
-            var collection = services.GetRequiredService<VectorStoreCollection<string, KnowledgeChunk>>();
+            var collection = services.GetRequiredService<VectorStoreCollection<Guid, KnowledgeChunk>>();
             await collection.EnsureCollectionExistsAsync(stoppingToken);
             await collection.UpsertAsync(chunks, stoppingToken);
 

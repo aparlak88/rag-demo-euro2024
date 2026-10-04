@@ -27,7 +27,7 @@ public sealed class RagService(
     IChatClient chatClient,
     [FromKeyedServices(RagService.RewriteClientKey)] IChatClient rewriteClient,
     IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-    VectorStoreCollection<string, KnowledgeChunk> collection,
+    VectorStoreCollection<Guid, KnowledgeChunk> collection,
     IOptions<RagOptions> options,
     ILogger<RagService> logger)
 {
