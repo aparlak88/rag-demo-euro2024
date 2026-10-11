@@ -131,7 +131,7 @@ ollama pull gemma3:4b
 ollama pull embeddinggemma
 ```
 
-(With Docker: `docker compose exec ollama ollama pull …`. Docker Desktop on macOS can't use the GPU, so there the first indexing run takes ~10 minutes on 4 CPUs instead of seconds; the embedding cache makes later starts instant.) Then start the app with `--Ai:Provider Ollama`. No API key or quota; answers are slower and less precise than the hosted models, a bigger model (`gemma3:12b`, `qwen3:14b`…) helps if your machine can run it.
+(With Docker: `docker compose exec ollama ollama pull …`. Docker Desktop on macOS can't use the GPU, so there the first indexing run takes ~10 minutes on 4 CPUs instead of seconds; the embedding cache makes later starts instant.) Then start the app with `--Ai:Provider Ollama`. No API key or quota; answers are slower and less precise than the hosted models: the default `gemma3:4b` fits small machines but misreads numbers in the sources now and then. If your machine can run it, use a bigger model: `gemma4:12b` (~8 GB) or, with more memory, `gemma4:26b` (~16–19 GB, a mixture-of-experts model that is fast for its size). Pull it and set `Ai:Ollama:ChatModels`, e.g. `--Ai:Ollama:ChatModels:0 gemma4:12b`. On Docker Desktop, give the VM enough memory for the chat model plus `embeddinggemma`.
 
 ## Choosing a vector database
 
