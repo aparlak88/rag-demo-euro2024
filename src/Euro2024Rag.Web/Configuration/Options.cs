@@ -19,7 +19,7 @@ public sealed class RagOptions
     /// <summary>How many chunks to retrieve per question.</summary>
     public int TopK { get; set; } = 8;
 
-    /// <summary>Chunks with a cosine similarity below this value are dropped.</summary>
+    /// <summary>Chunks with a cosine similarity below this value are dropped. <c>Ai:&lt;Provider&gt;:MinScore</c> overrides it.</summary>
     public double MinScore { get; set; } = 0.5;
 
     /// <summary>When to rewrite the question into a standalone English search query before retrieval.</summary>

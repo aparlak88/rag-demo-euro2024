@@ -117,6 +117,13 @@ public abstract class AiProviderOptions
     /// <summary>Overrides <see cref="ResilienceOptions.AttemptTimeout"/>, e.g. for local models that need time to load.</summary>
     public TimeSpan? AttemptTimeout { get; set; }
 
+    /// <summary>
+    /// Overrides <c>Rag:MinScore</c> when this provider embeds. Every embedding model has its own score scale:
+    /// Gemini scores relevant chunks around 0.6–0.75, text-embedding-3-small around 0.4–0.65 and embeddinggemma
+    /// around 0.35–0.6, so one threshold tuned on Gemini would drop most of the relevant chunks for the others.
+    /// </summary>
+    public double? MinScore { get; set; }
+
     public virtual string? GetConfigurationError() => null;
 
     /// <summary>Empty, or still the placeholder from appsettings.Development.example.json.</summary>

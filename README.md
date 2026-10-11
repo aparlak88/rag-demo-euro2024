@@ -70,7 +70,7 @@ Each chunk is written in natural language, with a descriptive first sentence ("U
 ### 3. Retrieval
 
 - Store: any `VectorStoreCollection<Guid, KnowledgeChunk>`; see [Choosing a vector database](#choosing-a-vector-database).
-- Similarity: cosine, top **8**, results below **0.5** are dropped (`Rag:TopK`, `Rag:MinScore`).
+- Similarity: cosine, top **8**, results below **0.5** are dropped (`Rag:TopK`, `Rag:MinScore`). Each embedding model has its own score scale, so the embedding provider can override the threshold (`Ai:<Provider>:MinScore`: OpenAI `0.4`, Ollama `0.35`).
 - **Query rewriting** (`Rag:QueryRewrite` = `FollowUps` by default): a follow-up is rewritten into a standalone English query using the conversation. After a question about Turkiye, *"Peki elendikleri maçta rakibe göre xG'leri nasıldı?"* becomes *"Turkiye vs Netherlands quarter final match xG stats Euro 2024"*. A first question is searched as-is: the default embedding models are multilingual, so the Turkish *"Türkiye turnuvada nasıl bir performans gösterdi?"* already retrieves the Turkiye team summary, all five Turkiye matches and the Group F table. Rewriting runs on its own chain of small models (`Ai:<Provider>:RewriteModels`, e.g. Flash-Lite), which is faster and, on the Gemini free tier, uses its own quota. If the rewrite fails, the raw question is used.
 - `GET /api/search?q=...` returns the raw retrieval results, which helps when tuning chunking.
 
@@ -114,6 +114,7 @@ Things that differ between the providers, and how the demo handles them:
 - **Temperature.** OpenAI reasoning models (gpt-5.x, o-series) reject any temperature but the default, so `Ai:OpenAI:SupportsTemperature` is `false` and the request leaves it out.
 - **Errors.** Each SDK reports HTTP errors differently (`ApiException`, `ClientResultException`, `HttpRequestException` / `OllamaException`); `AiErrors` maps them all to the same retry / fallback decisions. An Ollama model that hasn't been pulled counts as "model not found" and falls back like a 404.
 - **Timeouts and batch size.** A local model may need many seconds to load before the first token, so `Ai:Ollama:AttemptTimeout` (90 s) overrides the global 15 s. On a CPU an embedding model handles only a few documents per minute, so `Ai:Ollama:EmbeddingBatchSize` (5) overrides `Rag:EmbeddingBatchSize` (25); otherwise a batch would time out and be retried without progress.
+- **Score scale.** Every embedding model scores similarity on its own scale: for the same relevant chunks Gemini gives ~0.6–0.75, `text-embedding-3-small` ~0.4–0.65 and `embeddinggemma` ~0.35–0.6. A single `Rag:MinScore` of 0.5 would drop most of them for OpenAI and Ollama, so `Ai:OpenAI:MinScore` (0.4) and `Ai:Ollama:MinScore` (0.35) override it whenever that provider does the embedding.
 
 ### OpenAI
 
@@ -291,6 +292,7 @@ All settings are in `appsettings.json`:
 | `Ai:<Provider>:SupportsTemperature`  | `true` (OpenAI: `false`)                                                       | Send `Temperature` or leave it out                        |
 | `Ai:<Provider>:AttemptTimeout`       | *(global)* (Ollama: `00:01:30`)                                                | Overrides `Ai:Resilience:AttemptTimeout`                  |
 | `Ai:<Provider>:EmbeddingBatchSize`   | *(`Rag:EmbeddingBatchSize`)* (Ollama: `5`)                                     | Documents per embedding request for this provider         |
+| `Ai:<Provider>:MinScore`            | *(`Rag:MinScore`)* (OpenAI: `0.4`, Ollama: `0.35`)                              | Similarity threshold when this provider embeds            |
 | `Ai:Gemini:ApiKey`, `Ai:OpenAI:ApiKey` | —                                                                            | API keys (keep them in `appsettings.Development.json`)    |
 | `Ai:OpenAI:Endpoint`                 | *(api.openai.com)*                                                             | Any OpenAI-compatible API (Azure OpenAI, LM Studio, vLLM…) |
 | `Ai:Ollama:Endpoint`                 | `http://localhost:11434`                                                       | Ollama server                                             |
@@ -300,7 +302,7 @@ All settings are in `appsettings.json`:
 | `VectorStore:Qdrant:*`               | `Host`, `Port` (6334), `Https`, `ApiKey`                                       | Qdrant gRPC endpoint                                      |
 | `VectorStore:Chroma:*`               | `Endpoint`, `Tenant`, `Database`                                               | Chroma server                                             |
 | `Rag:TopK`                           | `8`                                                                            | Chunks retrieved per question                             |
-| `Rag:MinScore`                       | `0.5`                                                                          | Minimum cosine similarity                                 |
+| `Rag:MinScore`                       | `0.5`                                                                          | Minimum cosine similarity (overridden by `Ai:<Provider>:MinScore`) |
 | `Rag:QueryRewrite`                   | `FollowUps`                                                                    | `Off`, `FollowUps` or `Always`                            |
 | `Rag:MaxHistoryMessages`             | `6`                                                                            | Previous messages sent to the model                       |
 

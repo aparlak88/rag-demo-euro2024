@@ -24,6 +24,10 @@ public static class AiServiceCollectionExtensions
     {
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
 
+        // A similarity threshold belongs to the embedding model, so the embedding provider can override Rag:MinScore.
+        services.AddOptions<RagOptions>().PostConfigure<IOptions<AiOptions>>((rag, ai) =>
+            rag.MinScore = ai.Value.Embedding.MinScore ?? rag.MinScore);
+
         // Two model chains, each an IChatClient with Polly retries + fallback:
         // the answer chain, and a cheaper one for query rewriting (keyed service).
         services.AddSingleton<IChatClient>(sp =>
