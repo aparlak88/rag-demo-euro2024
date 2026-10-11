@@ -1,43 +1,5 @@
 namespace Euro2024Rag.Web.Configuration;
 
-public sealed class GeminiOptions
-{
-    public const string SectionName = "Gemini";
-
-    /// <summary>Google AI Studio API key. Keep it out of source control (see README).</summary>
-    public string ApiKey { get; set; } = "";
-
-    /// <summary>
-    /// Answer models, in fallback order: the first one is the primary, each next one is used when the
-    /// previous stays unavailable (quota, outage, unknown model id…). Set in appsettings.json.
-    /// (No default list here: the configuration binder appends to existing list items instead of replacing them.)
-    /// </summary>
-    public List<string> ChatModels { get; set; } = [];
-
-    /// <summary>
-    /// Models for query rewriting, in fallback order. A small, fast Flash-Lite model is enough for this
-    /// step, and on the free tier it uses its own quota instead of the answer models'.
-    /// </summary>
-    public List<string> RewriteModels { get; set; } = [];
-
-    /// <summary>Model used to turn documents and questions into vectors. Never falls back: vectors from different models are not comparable.</summary>
-    public string EmbeddingModel { get; set; } = "gemini-embedding-001";
-
-    public ResilienceOptions Resilience { get; set; } = new();
-}
-
-public sealed class ResilienceOptions
-{
-    /// <summary>Retries per model for transient errors (429, 5xx, timeouts).</summary>
-    public int MaxRetryAttempts { get; set; } = 2;
-
-    /// <summary>First retry delay; grows exponentially with jitter.</summary>
-    public TimeSpan BaseDelay { get; set; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>Max time for a single attempt. For streaming this is the time to the first token.</summary>
-    public TimeSpan AttemptTimeout { get; set; } = TimeSpan.FromSeconds(15);
-}
-
 public sealed class RagOptions
 {
     public const string SectionName = "Rag";
@@ -73,8 +35,8 @@ public enum QueryRewriteMode
     Off,
 
     /// <summary>
-    /// Rewrite only when there is chat history. A first question is already self-contained, and Gemini
-    /// embeddings are multilingual, so a Turkish question retrieves English chunks just fine.
+    /// Rewrite only when there is chat history. A first question is already self-contained, and multilingual
+    /// embedding models (Gemini, OpenAI, embeddinggemma) handle it, so a Turkish question retrieves English chunks just fine.
     /// Saves one LLM call per new conversation.
     /// </summary>
     FollowUps,

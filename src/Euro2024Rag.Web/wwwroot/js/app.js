@@ -41,11 +41,13 @@ $(function () {
     const placeholder = $input.attr("placeholder");
 
     const vectorStoreNames = { InMemory: "In-memory vector store", PgVector: "PostgreSQL + pgvector", Qdrant: "Qdrant", Chroma: "Chroma" };
+    const aiProviderNames = { Gemini: "Gemini", OpenAI: "OpenAI", Ollama: "Ollama" };
 
     function pollStatus() {
         $.getJSON("/api/status").done(function (s) {
             const ing = s.ingestion;
             $(".vector-store-name").text(vectorStoreNames[s.vectorStore.provider] || s.vectorStore.provider);
+            $(".ai-provider-name").text(aiProviderNames[s.ai.provider] || s.ai.provider);
             ready = ing.status === "Ready";
             $input.attr("placeholder", ready ? placeholder : ing.message);
             updateSendState();

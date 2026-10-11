@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Euro2024Rag.Web.Ai;
 using Euro2024Rag.Web.Configuration;
 using Euro2024Rag.Web.Rag;
 using Microsoft.Extensions.AI;
@@ -15,20 +16,20 @@ namespace Euro2024Rag.Web.Ingestion;
 public sealed class IngestionService(
     IServiceProvider services,
     IngestionState state,
-    IOptions<GeminiOptions> geminiOptions,
+    IOptions<AiOptions> aiOptions,
     IOptions<RagOptions> ragOptions,
     IHostEnvironment environment,
     ILogger<IngestionService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var gemini = geminiOptions.Value;
+        var ai = aiOptions.Value;
         var rag = ragOptions.Value;
+        var embeddingModel = ai.Embedding.EmbeddingModel;
 
-        if (string.IsNullOrWhiteSpace(gemini.ApiKey))
+        if (ai.GetConfigurationError() is { } configurationError)
         {
-            state.Update(new IngestionSnapshot(IngestionStatus.Failed,
-                "Gemini API key is missing. Set Gemini:ApiKey in appsettings.Development.json (see README)."));
+            state.Update(new IngestionSnapshot(IngestionStatus.Failed, configurationError));
             return;
         }
 
@@ -41,7 +42,7 @@ public sealed class IngestionService(
             var chunks = KnowledgeDocumentBuilder.Build(matches, context);
             logger.LogInformation("Built {Chunks} chunks from {Matches} matches", chunks.Count, matches.Count);
 
-            var cache = new EmbeddingCache(ResolvePath(rag.EmbeddingCacheFile), gemini.EmbeddingModel, KnowledgeChunk.EmbeddingDimensions);
+            var cache = new EmbeddingCache(ResolvePath(rag.EmbeddingCacheFile), ai.EmbeddingCacheModelKey(), KnowledgeChunk.EmbeddingDimensions);
             await cache.LoadAsync(stoppingToken);
 
             var missing = new List<KnowledgeChunk>();
@@ -60,14 +61,14 @@ public sealed class IngestionService(
             var cachedCount = chunks.Count - missing.Count;
             var generator = services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
             var embedded = 0;
-            foreach (var batch in missing.Chunk(rag.EmbeddingBatchSize))
+            foreach (var batch in missing.Chunk(ai.Embedding.EmbeddingBatchSize ?? rag.EmbeddingBatchSize))
             {
                 state.Update(new IngestionSnapshot(IngestionStatus.Running,
-                    $"Embedding documents with {gemini.EmbeddingModel}… ({embedded}/{missing.Count})",
+                    $"Embedding documents with {ai.ActiveEmbeddingProvider} {embeddingModel}… ({embedded}/{missing.Count})",
                     matches.Count, chunks.Count, embedded, cachedCount));
 
                 var embeddings = await generator.GenerateAsync(
-                    batch.Select(c => c.Content), GeminiEmbeddingOptions.ForDocuments, stoppingToken);
+                    batch.Select(c => c.Content), EmbeddingTasks.ForDocuments, stoppingToken);
 
                 for (var i = 0; i < batch.Length; i++)
                 {

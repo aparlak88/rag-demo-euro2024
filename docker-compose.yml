@@ -1,4 +1,4 @@
-# Vector databases for the Euro 2024 RAG demo. Start only the one VectorStore:Provider points at, e.g.
+# Vector databases (and Ollama) for the Euro 2024 RAG demo. Start only what VectorStore:Provider / Ai:Provider point at, e.g.
 #   docker compose up -d qdrant
 # Data is kept in named volumes; `docker compose down -v` wipes it.
 services:
@@ -34,7 +34,19 @@ services:
     volumes:
       - chroma-data:/data
 
+  # Local LLMs for Ai:Provider=Ollama. On macOS a native install (https://ollama.com/download) uses the GPU and is
+  # much faster; Docker Desktop on Mac runs it on the CPU. Pull the models once:
+  #   docker compose exec ollama ollama pull gemma3:4b
+  #   docker compose exec ollama ollama pull embeddinggemma
+  ollama:
+    image: ollama/ollama:0.40.0
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
 volumes:
+  ollama-data:
   pgvector-data:
   qdrant-data:
   chroma-data:

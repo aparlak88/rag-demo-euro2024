@@ -1,5 +1,4 @@
 using Euro2024Rag.Web.Configuration;
-using Google.GenAI;
 using Microsoft.Extensions.AI;
 using Polly;
 using Polly.Retry;
@@ -21,14 +20,14 @@ public sealed class RetryingEmbeddingGenerator : DelegatingEmbeddingGenerator<st
         _pipeline = new ResiliencePipelineBuilder()
             .AddRetry(new RetryStrategyOptions
             {
-                ShouldHandle = new PredicateBuilder().Handle<Exception>(GeminiErrors.IsTransient),
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(AiErrors.IsTransient),
                 MaxRetryAttempts = options.MaxRetryAttempts + 4,
                 Delay = options.BaseDelay * 2,
                 BackoffType = DelayBackoffType.Exponential,
                 UseJitter = true,
                 // Free-tier embedding quotas are per minute: a few seconds of backoff never clears a 429,
                 // so wait 15s, 30s, 45s, then 60s — long enough for the quota window to reset.
-                DelayGenerator = args => new ValueTask<TimeSpan?>(args.Outcome.Exception is ApiException { StatusCode: 429 }
+                DelayGenerator = args => new ValueTask<TimeSpan?>(args.Outcome.Exception is { } ex && AiErrors.IsRateLimited(ex)
                     ? TimeSpan.FromSeconds(Math.Min(15 * (args.AttemptNumber + 1), 60))
                     : null),
                 OnRetry = args =>

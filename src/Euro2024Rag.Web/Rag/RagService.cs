@@ -100,7 +100,7 @@ public sealed class RagService(
                             break;
                         }
                     }
-                    catch (Exception ex) when (attempt < MaxAnswerRestarts && GeminiErrors.IsTransient(ex) && !cancellationToken.IsCancellationRequested)
+                    catch (Exception ex) when (attempt < MaxAnswerRestarts && AiErrors.IsTransient(ex) && !cancellationToken.IsCancellationRequested)
                     {
                         interruption = ex;
                         break;
@@ -142,7 +142,7 @@ public sealed class RagService(
 
     public async Task<IReadOnlyList<RetrievedChunk>> SearchAsync(string query, int top, CancellationToken cancellationToken)
     {
-        var queryEmbedding = await embeddingGenerator.GenerateAsync(query, GeminiEmbeddingOptions.ForQuery, cancellationToken);
+        var queryEmbedding = await embeddingGenerator.GenerateAsync(query, EmbeddingTasks.ForQuery, cancellationToken);
 
         var results = new List<RetrievedChunk>();
         await foreach (var result in collection.SearchAsync(queryEmbedding.Vector, top, cancellationToken: cancellationToken))
@@ -185,7 +185,7 @@ public sealed class RagService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Retrieval still works on the raw question (Gemini embeddings are multilingual), just less precisely.
+            // Retrieval still works on the raw question (multilingual embeddings), just less precisely.
             logger.LogWarning(ex, "Query rewrite failed, searching with the original question");
             return question;
         }
