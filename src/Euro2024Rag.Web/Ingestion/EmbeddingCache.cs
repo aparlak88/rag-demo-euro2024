@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Euro2024Rag.Web.Ingestion;
 
@@ -9,9 +10,14 @@ namespace Euro2024Rag.Web.Ingestion;
 /// The index is rebuilt on every start (the in-memory store is empty, and switching to another vector store starts
 /// from an empty collection); this avoids paying for the same embeddings again.
 /// Changing a document's text or the embedding model automatically invalidates its entry.
+/// Each embedding model gets its own file (e.g. <c>embedding-cache.openai-text-embedding-3-small.json</c>): saving prunes
+/// entries of documents that no longer exist, which in a shared file would also delete the other models' entries, so
+/// switching between providers and back would re-embed everything.
 /// </summary>
-public sealed class EmbeddingCache(string path, string model, int dimensions)
+public sealed class EmbeddingCache(string basePath, string model, int dimensions)
 {
+    private readonly string path = PathFor(basePath, model);
+
     private Dictionary<string, float[]> _entries = [];
 
     public int Count => _entries.Count;
@@ -46,6 +52,15 @@ public sealed class EmbeddingCache(string path, string model, int dimensions)
     }
 
     public void Set(string text, ReadOnlyMemory<float> embedding) => _entries[KeyFor(text)] = embedding.ToArray();
+
+    /// <summary><c>App_Data/embedding-cache.json</c> + <c>Gemini:gemini-embedding-001</c> → <c>App_Data/embedding-cache.gemini-gemini-embedding-001.json</c>.</summary>
+    private static string PathFor(string basePath, string model)
+    {
+        var slug = Regex.Replace(model.ToLowerInvariant(), "[^a-z0-9.]+", "-").Trim('-');
+        slug = slug.Length > 60 ? slug[..60].TrimEnd('-') : slug;
+        var name = $"{Path.GetFileNameWithoutExtension(basePath)}.{slug}{Path.GetExtension(basePath)}";
+        return Path.Combine(Path.GetDirectoryName(basePath) ?? "", name);
+    }
 
     private string KeyFor(string text) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{model}|{dimensions}|{text}")));

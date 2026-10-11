@@ -1,37 +1,20 @@
 using System.Text.Json;
+using Euro2024Rag.Web.Ai;
 using Euro2024Rag.Web.Configuration;
 using Euro2024Rag.Web.Ingestion;
 using Euro2024Rag.Web.Rag;
 using Euro2024Rag.Web.Resilience;
 using Euro2024Rag.Web.VectorStores;
-using Google.GenAI;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection(GeminiOptions.SectionName));
 builder.Services.Configure<RagOptions>(builder.Configuration.GetSection(RagOptions.SectionName));
 
-// --- AI: Gemini behind the Microsoft.Extensions.AI abstractions -------------------------------
-builder.Services.AddSingleton(sp => new Client(apiKey: sp.GetRequiredService<IOptions<GeminiOptions>>().Value.ApiKey));
-
-// Two model chains, each an IChatClient with Polly retries + fallback:
-// the answer chain, and a cheaper one for query rewriting (keyed service).
-builder.Services.AddSingleton<IChatClient>(sp =>
-    CreateChatChain(sp, sp.GetRequiredService<IOptions<GeminiOptions>>().Value.ChatModels, "Gemini:ChatModels"));
-builder.Services.AddKeyedSingleton<IChatClient>(RagService.RewriteClientKey, (sp, _) =>
-    CreateChatChain(sp, sp.GetRequiredService<IOptions<GeminiOptions>>().Value.RewriteModels, "Gemini:RewriteModels"));
-
-builder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
-{
-    var gemini = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
-    return new RetryingEmbeddingGenerator(
-        sp.GetRequiredService<Client>().AsIEmbeddingGenerator(gemini.EmbeddingModel, KnowledgeChunk.EmbeddingDimensions),
-        gemini.Resilience,
-        sp.GetRequiredService<ILogger<RetryingEmbeddingGenerator>>());
-});
+// --- AI: Gemini, OpenAI or Ollama behind the Microsoft.Extensions.AI abstractions, chosen by Ai:Provider ---
+builder.Services.AddAiProviders(builder.Configuration);
 
 // --- Vector store: InMemory, PgVector, Qdrant or Chroma, chosen by VectorStore:Provider -------------
 builder.Services.AddKnowledgeVectorStore(builder.Configuration);
@@ -48,15 +31,16 @@ app.UseStaticFiles();
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/status", (IngestionState state, IOptions<GeminiOptions> gemini, IOptions<VectorStoreOptions> vectorStore) => new
+api.MapGet("/status", (IngestionState state, IOptions<AiOptions> ai, IOptions<VectorStoreOptions> vectorStore) => new
 {
     ingestion = state.Current,
     vectorStore = new { provider = vectorStore.Value.Provider.ToString(), collection = vectorStore.Value.CollectionName },
+    ai = new { provider = ai.Value.Provider.ToString(), embeddingProvider = ai.Value.ActiveEmbeddingProvider.ToString() },
     models = new
     {
-        chat = gemini.Value.ChatModels,
-        rewrite = gemini.Value.RewriteModels,
-        embedding = gemini.Value.EmbeddingModel,
+        chat = ai.Value.Chat.ChatModels,
+        rewrite = ai.Value.Chat.RewriteModels.Count > 0 ? ai.Value.Chat.RewriteModels : ai.Value.Chat.ChatModels,
+        embedding = ai.Value.Embedding.EmbeddingModel,
         dimensions = KnowledgeChunk.EmbeddingDimensions,
     },
 });
@@ -113,26 +97,12 @@ api.MapPost("/chat", async (ChatRequest request, IngestionState state, HttpConte
     catch (Exception ex)
     {
         logger.LogError(ex, "Chat request failed");
-        await WriteAsync(new ChatEvent("error", ex is ApiException api ? $"Gemini error {api.StatusCode}: {api.Message}" : ex.Message));
+        await WriteAsync(new ChatEvent("error", AiErrors.ToUserMessage(ex)));
     }
 
     return Results.Empty;
 });
 
 app.Run();
-
-static ResilientChatClient CreateChatChain(IServiceProvider sp, IReadOnlyList<string> modelIds, string settingName)
-{
-    if (modelIds.Count == 0)
-    {
-        throw new InvalidOperationException($"{settingName} must list at least one model.");
-    }
-
-    var client = sp.GetRequiredService<Client>();
-    return new ResilientChatClient(
-        modelIds.Select(id => new ChatModelEndpoint(id, client.AsIChatClient(id))).ToList(),
-        sp.GetRequiredService<IOptions<GeminiOptions>>().Value.Resilience,
-        sp.GetRequiredService<ILogger<ResilientChatClient>>());
-}
 
 internal sealed record ChatRequest(IReadOnlyList<ChatTurn> Messages);

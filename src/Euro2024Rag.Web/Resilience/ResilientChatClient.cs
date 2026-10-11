@@ -12,8 +12,8 @@ public sealed record ChatModelEndpoint(string ModelId, IChatClient Client);
 
 /// <summary>
 /// An <see cref="IChatClient"/> over an ordered chain of models: it retries transient failures and,
-/// when a model stays unavailable, falls back to the next one. The Gemini SDK only offers same-model
-/// HTTP retries, so the chain is built with Polly — one pipeline per model:
+/// when a model stays unavailable, falls back to the next one. The provider SDKs only offer same-model
+/// HTTP retries (if any), so the chain is built with Polly — one pipeline per model:
 ///
 ///   model[0]:  Fallback (→ model[1] pipeline)
 ///                └─ Retry (exponential backoff + jitter)
@@ -22,6 +22,7 @@ public sealed record ChatModelEndpoint(string ModelId, IChatClient Client);
 ///   …
 ///   model[n]:  Retry └─ Timeout                      (last model: nothing left to fall back to)
 ///
+/// It works the same for every provider (Gemini, OpenAI, Ollama); <see cref="AiErrors"/> classifies their errors.
 /// On the Gemini free tier each model has its own daily quota, so every model in the chain adds capacity.
 /// Streaming can only fall back before the first text has been sent to the caller, so the pipeline wraps
 /// "open the stream and read up to the first update with visible content". Thinking models may send
@@ -147,7 +148,7 @@ public sealed class ResilientChatClient : IChatClient
 
     private FallbackStrategyOptions<T> CreateFallback<T>(ResiliencePipeline<T>[] chain, int index) => new()
     {
-        ShouldHandle = new PredicateBuilder<T>().Handle<Exception>(GeminiErrors.ShouldFallback),
+        ShouldHandle = new PredicateBuilder<T>().Handle<Exception>(AiErrors.ShouldFallback),
         FallbackAction = async args =>
         {
             var operation = (Func<ChatModelEndpoint, CancellationToken, ValueTask<T>>)args.Context.Properties.GetValue(OperationKey, null!);
@@ -156,14 +157,14 @@ public sealed class ResilientChatClient : IChatClient
         OnFallback = args =>
         {
             _logger.LogWarning("Chat model {Model} unavailable ({Reason}), falling back to {Next}",
-                _models[index].ModelId, Describe(args.Outcome.Exception), _models[index + 1].ModelId);
+                _models[index].ModelId, AiErrors.Describe(args.Outcome.Exception), _models[index + 1].ModelId);
             return default;
         },
     };
 
     private RetryStrategyOptions<T> CreateRetry<T>(string modelId) => new()
     {
-        ShouldHandle = new PredicateBuilder<T>().Handle<Exception>(GeminiErrors.IsTransient),
+        ShouldHandle = new PredicateBuilder<T>().Handle<Exception>(AiErrors.IsTransient),
         MaxRetryAttempts = _options.MaxRetryAttempts,
         Delay = _options.BaseDelay,
         BackoffType = DelayBackoffType.Exponential,
@@ -171,17 +172,9 @@ public sealed class ResilientChatClient : IChatClient
         OnRetry = args =>
         {
             _logger.LogWarning("Chat model {Model} failed ({Reason}), retry {Attempt}/{Max} in {Delay}",
-                modelId, Describe(args.Outcome.Exception), args.AttemptNumber + 1, _options.MaxRetryAttempts, args.RetryDelay);
+                modelId, AiErrors.Describe(args.Outcome.Exception), args.AttemptNumber + 1, _options.MaxRetryAttempts, args.RetryDelay);
             return default;
         },
-    };
-
-    private static string Describe(Exception? exception) => exception switch
-    {
-        null => "unknown",
-        _ when GeminiErrors.IsDailyQuotaExhausted(exception) => "daily quota exhausted",
-        Google.GenAI.ApiException api => $"HTTP {api.StatusCode}",
-        _ => exception.GetType().Name,
     };
 
     private static async ValueTask<ChatResponse> GetResponseFromAsync(
@@ -201,6 +194,7 @@ public sealed class ResilientChatClient : IChatClient
         try
         {
             var buffered = new List<ChatResponseUpdate>();
+            var started = false;
             while (await enumerator.MoveNextAsync())
             {
                 var update = enumerator.Current;
@@ -208,8 +202,16 @@ public sealed class ResilientChatClient : IChatClient
                 buffered.Add(update);
                 if (HasVisibleContent(update))
                 {
+                    started = true;
                     break;
                 }
+            }
+
+            // A stream that ends without any text is a failure, not an empty answer: Ollama, for one, reports errors
+            // after HTTP 200 as an {"error": …} line, which OllamaSharp silently drops.
+            if (!started)
+            {
+                throw new EmptyResponseException(model.ModelId);
             }
 
             // Content arrived: from now on only the caller may cancel, a long answer must not be cut off.
@@ -248,3 +250,7 @@ public sealed class ResilientChatClient : IChatClient
         }
     }
 }
+
+/// <summary>The model ended its response without any visible content.</summary>
+public sealed class EmptyResponseException(string modelId)
+    : Exception($"{modelId} ended its response without any text.");
