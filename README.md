@@ -219,23 +219,57 @@ Data quality issues found and handled in `MatchCsvReader`:
 
 ## Getting started
 
-**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download) and one of: a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) (default), an OpenAI API key, or [Ollama](https://ollama.com/download) for local models (see [Choosing an LLM provider](#choosing-an-llm-provider)). Docker is only needed for pgvector, Qdrant, Chroma or a containerized Ollama.
+**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download), plus **one** LLM provider. None of them is required; pick whichever you have:
 
-1. Add your key. The key goes in `appsettings.Development.json`, which is git-ignored:
+| Provider | You need | Cost | Speed / quality |
+| -------- | -------- | ---- | --------------- |
+| **Ollama** | [Ollama](https://ollama.com/download) installed, no account | Free, runs locally | Slower, smaller models |
+| **Gemini** (default) | A key from [Google AI Studio](https://aistudio.google.com/apikey) | Free tier | Fast, best answers in this demo |
+| **OpenAI** | A key from [platform.openai.com](https://platform.openai.com/api-keys) with credit, or any [OpenAI-compatible API](#openai) | Paid | Fast |
+
+Docker is only needed for pgvector, Qdrant, Chroma or a containerized Ollama.
+
+### Option A: Ollama (local, no account, no API key)
+
+1. Pull the models (once):
+
+   ```bash
+   ollama pull gemma3:4b
+   ```
+
+   ```bash
+   ollama pull embeddinggemma
+   ```
+2. Run the app with Ollama selected:
+
+   ```bash
+   dotnet run --project src/Euro2024Rag.Web -- --Ai:Provider Ollama
+   ```
+
+   To make it permanent, put `"Ai": { "Provider": "Ollama" }` in `src/Euro2024Rag.Web/appsettings.Development.json`, or set `Ai__Provider=Ollama`.
+
+With a GPU (or Apple silicon, native install) the first start takes well under a minute; on a CPU only (e.g. Ollama in Docker on macOS) embedding the ~106 chunks takes ~10 minutes once, later starts load them from the cache. See [Ollama (local models)](#ollama-local-models).
+
+### Option B: Gemini or OpenAI (API key)
+
+1. Create `appsettings.Development.json`, which is git-ignored, from the example:
 
    ```bash
    cp src/Euro2024Rag.Web/appsettings.Development.example.json src/Euro2024Rag.Web/appsettings.Development.json
    ```
 
-   Then replace the placeholder with your key. You can use an environment variable instead (`Ai__Gemini__ApiKey=...`).
+   Set `Ai:Provider` to `Gemini` or `OpenAI` and replace that provider's placeholder key; the other placeholder can stay, it is never read. Environment variables work too (`Ai__Provider=OpenAI`, `Ai__OpenAI__ApiKey=...`).
 
-   > Upgrading from an earlier version? The key moved from `Gemini:ApiKey` to `Ai:Gemini:ApiKey`.
+   > Upgrading from an earlier version? The Gemini key moved from `Gemini:ApiKey` to `Ai:Gemini:ApiKey`.
 2. Run the app:
 
    ```bash
    dotnet run --project src/Euro2024Rag.Web
    ```
-3. Open http://localhost:5231. The first start embeds ~106 chunks (a few seconds); later starts load them from the cache.
+
+### Then
+
+Open http://localhost:5231. The first start embeds ~106 chunks; later starts load them from the cache. If the selected provider isn't configured (e.g. no key), the chat stays disabled and the input box says what is missing.
 
 This uses the in-memory store, which needs no setup. To use pgvector, Qdrant or Chroma, see [Running with a vector database](#running-with-a-vector-database).
 

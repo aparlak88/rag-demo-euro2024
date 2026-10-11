@@ -227,6 +227,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- Composer ---------- */
 .composer-wrap { padding: 8px 16px 18px; }
+.setup-notice {
+    max-width: 780px; margin: 0 auto 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--err);
+    border-radius: var(--radius);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-size: 14px; line-height: 1.5;
+    overflow-wrap: anywhere;
+}
 .composer {
     max-width: 780px; margin: 0 auto;
     display: flex; align-items: flex-end; gap: 8px;

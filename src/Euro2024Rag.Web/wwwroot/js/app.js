@@ -49,7 +49,10 @@ $(function () {
             $(".vector-store-name").text(vectorStoreNames[s.vectorStore.provider] || s.vectorStore.provider);
             $(".ai-provider-name").text(aiProviderNames[s.ai.provider] || s.ai.provider);
             ready = ing.status === "Ready";
-            $input.attr("placeholder", ready ? placeholder : ing.message);
+            const failed = ing.status === "Failed";
+            // A setup error (missing key, unreachable database…) is too long for the placeholder: show it in full.
+            $("#setup-notice").text(failed ? ing.message : "").prop("hidden", !failed);
+            $input.attr("placeholder", ready ? placeholder : failed ? "Not ready, see the message above." : ing.message);
             updateSendState();
             if (ing.status === "Pending" || ing.status === "Running") {
                 setTimeout(pollStatus, 1000);

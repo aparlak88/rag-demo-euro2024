@@ -50,12 +50,13 @@ public sealed class AiOptions
     /// <summary>Why the configured providers can't be used (e.g. a missing API key), or null when they can.</summary>
     public string? GetConfigurationError()
     {
-        foreach (var provider in new[] { Provider, ActiveEmbeddingProvider }.Distinct())
+        foreach (var (provider, setting) in new[] { (Provider, "Provider"), (ActiveEmbeddingProvider, "EmbeddingProvider") })
         {
-            var error = For(provider).GetConfigurationError();
-            if (error is not null)
+            if (For(provider).GetConfigurationError() is { } error)
             {
-                return error;
+                // Point at the way out: every provider is optional, Ollama needs no account at all.
+                var others = Enum.GetValues<AiProvider>().Where(p => p != provider).Select(p => p == AiProvider.Ollama ? "Ollama (local, no account)" : p.ToString());
+                return $"{error} Or set {SectionName}:{setting} to another provider: {string.Join(" or ", others)}. See README.";
             }
         }
 
@@ -117,6 +118,10 @@ public abstract class AiProviderOptions
     public TimeSpan? AttemptTimeout { get; set; }
 
     public virtual string? GetConfigurationError() => null;
+
+    /// <summary>Empty, or still the placeholder from appsettings.Development.example.json.</summary>
+    protected static bool IsMissing(string apiKey) =>
+        string.IsNullOrWhiteSpace(apiKey) || apiKey.StartsWith("paste-your-", StringComparison.Ordinal);
 }
 
 public sealed class GeminiProviderOptions : AiProviderOptions
@@ -124,8 +129,8 @@ public sealed class GeminiProviderOptions : AiProviderOptions
     /// <summary>Google AI Studio API key. Keep it out of source control (see README).</summary>
     public string ApiKey { get; set; } = "";
 
-    public override string? GetConfigurationError() => string.IsNullOrWhiteSpace(ApiKey)
-        ? "Gemini API key is missing. Set Ai:Gemini:ApiKey in appsettings.Development.json (see README)."
+    public override string? GetConfigurationError() => IsMissing(ApiKey)
+        ? "Gemini API key is missing: set Ai:Gemini:ApiKey in appsettings.Development.json."
         : null;
 }
 
@@ -141,8 +146,8 @@ public sealed class OpenAIProviderOptions : AiProviderOptions
     public string Endpoint { get; set; } = "";
 
     public override string? GetConfigurationError() =>
-        string.IsNullOrWhiteSpace(ApiKey) && string.IsNullOrWhiteSpace(Endpoint)
-            ? "OpenAI API key is missing. Set Ai:OpenAI:ApiKey in appsettings.Development.json (see README)."
+        IsMissing(ApiKey) && string.IsNullOrWhiteSpace(Endpoint)
+            ? "OpenAI API key is missing: set Ai:OpenAI:ApiKey in appsettings.Development.json."
             : null;
 }
 
