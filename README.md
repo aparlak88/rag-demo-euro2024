@@ -65,7 +65,7 @@ Each chunk is written in natural language, with a descriptive first sentence ("U
 
 - Model: `gemini-embedding-001` by default, truncated to **768 dimensions** (Matryoshka representation), which is plenty for ~100 chunks. The OpenAI (`text-embedding-3-small`, truncated) and Ollama (`embeddinggemma`, native 768) defaults use the same size, so the vector store schema never changes.
 - Documents and questions are embedded differently. The RAG code only marks what is being embedded (`EmbeddingTasks.ForDocuments` / `ForQuery`); `TaskAwareEmbeddingGenerator` turns that into what the provider understands: Gemini task types `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` (through `EmbeddingGenerationOptions.RawRepresentationFactory`, since Microsoft.Extensions.AI has no task-type concept), or the text prefixes an open model was trained with (`DocumentPrefix` / `QueryPrefix`). It also fails with a clear message if a model returns a different number of dimensions.
-- Embeddings are cached in `App_Data/embedding-cache.json`, keyed by `sha256(provider:model | dimensions | text)`. Changing a chunk's text re-embeds only that chunk; switching the embedding provider or model re-embeds everything.
+- Embeddings are cached in one file per embedding model, e.g. `App_Data/embedding-cache.gemini-gemini-embedding-001.json`, keyed by `sha256(provider:model | dimensions | text)`. Changing a chunk's text re-embeds only that chunk. A new embedding model embeds everything once; switching back to a model used before loads its file again.
 
 ### 3. Retrieval
 
@@ -108,7 +108,7 @@ dotnet run --project src/Euro2024Rag.Web -- --Ai:Provider Ollama
 
 Things that differ between the providers, and how the demo handles them:
 
-- **Embedding space.** Vectors from different models can't be compared, so the embedding model never falls back, and the embedding cache key includes provider and model. After switching the embedding provider the index is re-embedded at startup and every chunk is upserted again (same deterministic keys), so persistent vector stores are overwritten in place. The model must produce 768 dimensions (or truncate to it): Gemini and OpenAI `text-embedding-3-*` truncate, `embeddinggemma` and `nomic-embed-text` are 768 natively.
+- **Embedding space.** Vectors from different models can't be compared, so the embedding model never falls back, and each embedding model has its own cache file. After switching the embedding provider the index is re-embedded at startup (or loaded from that model's cache) and every chunk is upserted again (same deterministic keys), so persistent vector stores are overwritten in place. The model must produce 768 dimensions (or truncate to it): Gemini and OpenAI `text-embedding-3-*` truncate, `embeddinggemma` and `nomic-embed-text` are 768 natively.
 - **Asymmetric embeddings.** Gemini has task types; open models use prefixes instead. The Ollama defaults are `embeddinggemma`'s prompts (`title: none | text: ` / `task: search result | query: `); for `nomic-embed-text` use `search_document: ` / `search_query: `.
 - **Mixing providers.** `"Provider": "Ollama", "EmbeddingProvider": "Gemini"` answers with a local model while keeping Gemini embeddings (and their cache).
 - **Temperature.** OpenAI reasoning models (gpt-5.x, o-series) reject any temperature but the default, so `Ai:OpenAI:SupportsTemperature` is `false` and the request leaves it out.

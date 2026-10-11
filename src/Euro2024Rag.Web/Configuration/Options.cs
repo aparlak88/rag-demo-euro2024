@@ -10,7 +10,10 @@ public sealed class RagOptions
     /// <summary>Hand-curated facts that the CSV does not contain (stages, groups, cities, extra time / penalties).</summary>
     public string ContextFile { get; set; } = "Data/tournament-context.json";
 
-    /// <summary>Embeddings are cached on disk so restarts don't re-embed unchanged documents.</summary>
+    /// <summary>
+    /// Embeddings are cached on disk so restarts don't re-embed unchanged documents.
+    /// The embedding model is added to the file name, one file per model.
+    /// </summary>
     public string EmbeddingCacheFile { get; set; } = "App_Data/embedding-cache.json";
 
     /// <summary>How many chunks to retrieve per question.</summary>
