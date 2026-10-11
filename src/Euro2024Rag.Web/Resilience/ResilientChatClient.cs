@@ -194,6 +194,7 @@ public sealed class ResilientChatClient : IChatClient
         try
         {
             var buffered = new List<ChatResponseUpdate>();
+            var started = false;
             while (await enumerator.MoveNextAsync())
             {
                 var update = enumerator.Current;
@@ -201,8 +202,16 @@ public sealed class ResilientChatClient : IChatClient
                 buffered.Add(update);
                 if (HasVisibleContent(update))
                 {
+                    started = true;
                     break;
                 }
+            }
+
+            // A stream that ends without any text is a failure, not an empty answer: Ollama, for one, reports errors
+            // after HTTP 200 as an {"error": …} line, which OllamaSharp silently drops.
+            if (!started)
+            {
+                throw new EmptyResponseException(model.ModelId);
             }
 
             // Content arrived: from now on only the caller may cancel, a long answer must not be cut off.
@@ -241,3 +250,7 @@ public sealed class ResilientChatClient : IChatClient
         }
     }
 }
+
+/// <summary>The model ended its response without any visible content.</summary>
+public sealed class EmptyResponseException(string modelId)
+    : Exception($"{modelId} ended its response without any text.");

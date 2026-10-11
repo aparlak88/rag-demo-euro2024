@@ -23,8 +23,11 @@ public static class AiErrors
         // OpenAI: no HTTP response at all (connection refused / reset), status 0.
         ClientResultException => true,
 
-        // The Gemini SDK throws this when a streamed response is cut off mid-way (server or connection dropped it).
+        // A response that was cut off or ended without content (server or connection dropped it, or the model failed
+        // after the response had started): Gemini SDK, OllamaSharp, or ResilientChatClient's own check.
         InvalidOperationException when exception.Message.StartsWith("Incomplete JSON segment", StringComparison.Ordinal) => true,
+        InvalidOperationException when exception.Message.Contains("did not yield an item with Done=true", StringComparison.Ordinal) => true,
+        EmptyResponseException => true,
         _ => false,
     };
 
@@ -59,6 +62,7 @@ public static class AiErrors
     public static string Describe(Exception? exception) => exception switch
     {
         null => "unknown",
+        EmptyResponseException => "empty response",
         _ when IsDailyQuotaExhausted(exception) => "quota exhausted",
         _ when StatusCode(exception) is { } status => $"HTTP {status}",
         OllamaException => exception.Message,

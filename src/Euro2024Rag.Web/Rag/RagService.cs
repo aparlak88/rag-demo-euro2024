@@ -84,9 +84,11 @@ public sealed class RagService(
         // The chat client can only fall back to another model before the first token. If the stream breaks
         // after that (seen under heavy load: the server cuts the response mid-way), the answer is regenerated
         // from scratch and the browser is told to discard the partial text with a "reset" event.
+        // A failure before any text has already been through the chat client's retries and fallback, so it surfaces.
         for (var attempt = 0; ; attempt++)
         {
             Exception? interruption = null;
+            var sentText = false;
             var stream = chatClient.GetStreamingResponseAsync(messages, new ChatOptions { Temperature = 0.2f }, cancellationToken)
                 .GetAsyncEnumerator(cancellationToken);
             try
@@ -100,7 +102,7 @@ public sealed class RagService(
                             break;
                         }
                     }
-                    catch (Exception ex) when (attempt < MaxAnswerRestarts && AiErrors.IsTransient(ex) && !cancellationToken.IsCancellationRequested)
+                    catch (Exception ex) when (sentText && attempt < MaxAnswerRestarts && AiErrors.IsTransient(ex) && !cancellationToken.IsCancellationRequested)
                     {
                         interruption = ex;
                         break;
@@ -111,6 +113,7 @@ public sealed class RagService(
                     usage = update.Contents.OfType<UsageContent>().LastOrDefault()?.Details ?? usage;
                     if (!string.IsNullOrEmpty(update.Text))
                     {
+                        sentText = true;
                         yield return new ChatEvent("delta", update.Text);
                     }
                 }
