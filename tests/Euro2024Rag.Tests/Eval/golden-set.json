@@ -77,5 +77,69 @@
     "id": "unanswerable-final-scorers",
     "question": "Who scored in the final?",
     "answerable": false
+    },
+  {
+    "id": "compare-spain-england-tournament",
+    "question": "Compare Spain and England over the whole tournament: who scored more goals, and how did each finish?",
+    "expectedChunkIds": ["team-spain", "team-england"],
+    "mustMention": ["Champions", "Runners-up", "15", "8"]
+  },
+  {
+    "id": "indirect-worst-finishing",
+    "question": "Which team squandered the most chances relative to the quality of what they created?",
+    "expectedChunkIds": ["leaderboard-xg-overperformance"],
+    "mustMention": ["France", "5.18"]
+  },
+  {
+    "id": "oblique-dutch-goals-conceded",
+    "question": "How many goals did the Dutch let in during the tournament?",
+    "expectedChunkIds": ["team-netherlands"],
+    "mustMention": ["7"]
+  },
+  {
+    "id": "oblique-bavarian-capital-matches",
+    "question": "Which games were played in the Bavarian capital?",
+    "expectedChunkIds": ["venue-munich"],
+    "mustMention": ["Germany 5–1 Scotland", "Romania 0–3 Netherlands", "Spain 2–1 France"]
+  },
+  {
+    "id": "oblique-dortmund-semi-final",
+    "question": "Who won the semi-final in Dortmund, and what was the score?",
+    "expectedChunkIds": ["match-50"],
+    "mustMention": ["England", "1–2"]
+  },
+  {
+    "id": "followup-two-turns-yellow-cards",
+    "question": "How many yellow cards did they pick up over the whole tournament?",
+    "history": [
+      { "role": "user", "content": "Who knocked Germany out of Euro 2024?" },
+      { "role": "assistant", "content": "Spain beat Germany 2–1 after extra time in the quarter-final in Stuttgart." },
+      { "role": "user", "content": "And who did they face after that?" },
+      { "role": "assistant", "content": "In the semi-final in Munich, Spain beat France 2–1." }
+    ],
+    "expectedChunkIds": ["team-spain"],
+    "mustMention": ["14"]
+  },
+  {
+    "id": "tr-group-d-austria-points",
+    "question": "Hollanda'nın grubunda hangi takımlar vardı ve Avusturya kaç puan topladı?",
+    "expectedChunkIds": ["group-d"],
+    "mustMention": ["Austria", "France", "Poland", "6"]
+  },
+  {
+    "id": "keywords-spain-xg",
+    "question": "Spain xG",
+    "expectedChunkIds": ["team-spain", "leaderboard-expected-goals"],
+    "mustMention": ["12.83"]
+  },
+  {
+    "id": "unanswerable-goal-minute",
+    "question": "In which minute did Spain score its winning goal in the final?",
+    "answerable": false
+  },
+  {
+    "id": "unanswerable-top-individual-scorer",
+    "question": "Which individual player was the tournament's top scorer?",
+    "answerable": false
   }
 ]

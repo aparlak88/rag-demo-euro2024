@@ -323,11 +323,11 @@ All settings are in `appsettings.json`:
 dotnet test
 ```
 
-Runs from the repo root with the xunit.v3 / Microsoft.Testing.Platform runner (see `global.json`). The ~78 unit tests are offline: no provider, vector database or network is needed. The RAG evaluation cases are listed but skipped (this is also what CI runs).
+Runs from the repo root with the xunit.v3 / Microsoft.Testing.Platform runner (see `global.json`). The unit tests are offline: no provider, vector database or network is needed. The RAG evaluation cases are listed but skipped (this is also what CI runs).
 
 ### RAG evaluation (opt-in)
 
-`tests/Euro2024Rag.Tests/Eval` runs 12 golden questions (`golden-set.json`) through the real pipeline and measures retrieval and answer quality. It calls your configured providers, so it is skipped unless `EVAL=1`:
+`tests/Euro2024Rag.Tests/Eval` runs 22 golden questions (`golden-set.json`) through the real pipeline and measures retrieval and answer quality. It calls your configured providers, so it is skipped unless `EVAL=1`:
 
 ```bash
 EVAL=1 dotnet test -- --filter-trait "Category=Eval"
@@ -364,7 +364,7 @@ EVAL=1 Ai__Provider=Ollama Ai__EmbeddingProvider=Ollama VectorStore__Provider=Qd
 
 - The judge is the answering model, so correct and faithful scores are not strictly comparable across chat providers.
 - The evaluation makes real chat and embedding calls: mind quota and cost.
-- With only 12 cases, a single miss moves the percentages a lot. Use it to spot regressions, not to rank models precisely.
+- With only 22 cases, a single miss moves the percentages a lot. Use it to spot regressions, not to rank models precisely.
 
 ## Project structure
 
