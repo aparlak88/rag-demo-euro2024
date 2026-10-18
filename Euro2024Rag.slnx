@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Euro2024Rag.Web/Euro2024Rag.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Euro2024Rag.Tests/Euro2024Rag.Tests.csproj" />
+  </Folder>
 </Solution>
