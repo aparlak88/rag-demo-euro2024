@@ -315,6 +315,57 @@ All settings are in `appsettings.json`:
 | `GET /api/search?q=...&top=8` | Retrieval only: the chunks and scores the model would see                 |
 | `POST /api/chat`              | `{ "messages": [{ "role": "user", "content": "..." }] }` → NDJSON stream |
 
+## Testing and evaluation
+
+### Unit tests
+
+```bash
+dotnet test
+```
+
+Runs from the repo root with the xunit.v3 / Microsoft.Testing.Platform runner (see `global.json`). The ~78 unit tests are offline: no provider, vector database or network is needed. The RAG evaluation cases are listed but skipped (this is also what CI runs).
+
+### RAG evaluation (opt-in)
+
+`tests/Euro2024Rag.Tests/Eval` runs 12 golden questions (`golden-set.json`) through the real pipeline and measures retrieval and answer quality. It calls your configured providers, so it is skipped unless `EVAL=1`:
+
+```bash
+EVAL=1 dotnet test -- --filter-trait "Category=Eval"
+```
+
+(With the Microsoft.Testing.Platform runner, use `--filter-trait`; the VSTest-style `--filter Category=Eval` does not apply.)
+
+The system under test comes from the app's normal configuration (Development environment, so `appsettings.Development.json` is used) and can be overridden with environment variables, e.g. to evaluate Ollama with Qdrant:
+
+```bash
+EVAL=1 Ai__Provider=Ollama Ai__EmbeddingProvider=Ollama VectorStore__Provider=Qdrant \
+  dotnet test -- --filter-trait "Category=Eval"
+```
+
+| Variable              | Default | Description                                                      |
+| --------------------- | ------- | ---------------------------------------------------------------- |
+| `EVAL`                | *(off)* | Set to `1` to run the evaluation                                 |
+| `EVAL_INGEST_TIMEOUT` | `600`   | Seconds to wait for indexing to finish before failing the run    |
+
+**Reports** are written to `TestResults/eval/` relative to the test process's working directory (normally the test project's build output, e.g. `tests/Euro2024Rag.Tests/bin/Release/net10.0/`; git-ignored). Each run produces `<yyyyMMdd-HHmmss>_<chat>_<embeddings>_<vectorstore>.md` and a `.json` twin. The report has a header (chat and embedding providers and models, vector store, TopK, MinScore, query rewrite), a per-case table (hit, recall, reciprocal rank, correct, faithful, latency, tokens, model) and totals.
+
+**Metrics**
+
+| Metric           | Meaning                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| Hit rate         | Share of cases where at least one expected chunk was retrieved                              |
+| Mean recall@K    | Average share of the expected chunks found in the top K                                     |
+| MRR              | Mean reciprocal rank of the first expected chunk (answerable cases only)                    |
+| % correct        | Judge verdict: the answer matches the reference facts                                       |
+| % faithful       | Judge verdict: the answer is supported by the retrieved context                             |
+| Judge errors     | Judge calls that failed or returned unparseable output; counted separately, not as incorrect |
+
+**Caveats**
+
+- The judge is the answering model, so correct and faithful scores are not strictly comparable across chat providers.
+- The evaluation makes real chat and embedding calls: mind quota and cost.
+- With only 12 cases, a single miss moves the percentages a lot. Use it to spot regressions, not to rank models precisely.
+
 ## Project structure
 
 ```
@@ -328,4 +379,11 @@ src/Euro2024Rag.Web
 ├── VectorStores/       Provider selection (DI), ChromaKnowledgeCollection
 ├── wwwroot/            jQuery chat UI
 └── Program.cs          DI wiring + minimal API endpoints
+```
+
+```
+tests/Euro2024Rag.Tests
+├── Unit/               Offline unit tests (ingestion, resilience, retrieval, AI wiring)
+├── Eval/               Opt-in RAG evaluation: golden set, metrics, judge, report
+└── Fakes/              Test doubles
 ```
