@@ -106,3 +106,5 @@ api.MapPost("/chat", async (ChatRequest request, IngestionState state, HttpConte
 app.Run();
 
 internal sealed record ChatRequest(IReadOnlyList<ChatTurn> Messages);
+
+public partial class Program;

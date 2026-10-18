@@ -7,7 +7,6 @@ obj/
 .vscode/
 TestResults/
 .DS_Store
-tests/
 
 # Secrets: the Gemini API key lives here (copy appsettings.Development.example.json)
 appsettings.Development.json
