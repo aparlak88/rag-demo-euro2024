@@ -57,7 +57,7 @@ public static class EvalReport
         sb.AppendLine("## Totals");
         sb.AppendLine();
         sb.AppendLine($"- Cases: {results.Count} ({s.WithExpected} with expected chunks)");
-        sb.AppendLine($"- Hit rate: {(s.WithExpected == 0 ? "n/a" : $"{s.Hits}/{s.WithExpected} ({(double)s.Hits / s.WithExpected:P0})")}");
+        sb.AppendLine($"- Hit rate: {(s.WithExpected == 0 ? "n/a" : $"{s.Hits}/{s.WithExpected} ({Pct((double)s.Hits / s.WithExpected)})")}");
         sb.AppendLine($"- Mean recall: {(s.MeanRecall is { } mr ? mr.ToString("0.00", Inv) : "n/a")}");
         sb.AppendLine($"- MRR: {(s.Mrr is { } mrr ? mrr.ToString("0.00", Inv) : "n/a")}");
         sb.AppendLine($"- Judged correct: {s.Correct}/{s.Judged}, faithful: {s.Faithful}/{s.Judged}");
@@ -99,6 +99,7 @@ public static class EvalReport
             results.Count(r => r.Error is not null));
     }
 
+    private static string Pct(double d) => $"{(d * 100).ToString("0", Inv)}%";
     private static string YesNo(bool b) => b ? "yes" : "no";
     private static string Num(double? d) => d is { } v ? v.ToString("0.00", Inv) : "-";
     private static string Cell(string s) => s.Replace("|", "\\|").ReplaceLineEndings(" ");

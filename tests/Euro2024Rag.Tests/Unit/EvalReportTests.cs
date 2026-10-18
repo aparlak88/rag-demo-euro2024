@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Euro2024Rag.Tests.Eval;
 
@@ -38,6 +39,29 @@ public class EvalReportTests
         Assert.Contains("0.25", md);         // MRR (0.5 + 0) / 2
         Assert.DoesNotContain("NaN", md);
         Assert.DoesNotContain("∞", md);
+    }
+
+    [Fact]
+    public void Markdown_hit_rate_is_culture_invariant()
+    {
+        IReadOnlyList<CaseResult> all =
+        [
+            Result("a", true, 1.0, 1.0, null, false),
+            Result("b", true, 1.0, 1.0, null, false),
+        ];
+        var saved = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
+            var md = EvalReport.ToMarkdown(Header(), all);
+
+            Assert.Contains("2/2 (100%)", md);
+            Assert.DoesNotContain("%100", md);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = saved;
+        }
     }
 
     [Fact]
