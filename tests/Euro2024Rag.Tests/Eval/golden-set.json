@@ -1,0 +1,81 @@
+[
+  {
+    "id": "final-stats",
+    "question": "Compare the stats of the final.",
+    "expectedChunkIds": ["match-51"],
+    "mustMention": ["Spain", "England", "2–1"]
+  },
+  {
+    "id": "team-spain",
+    "question": "How did Spain do at Euro 2024?",
+    "expectedChunkIds": ["team-spain"],
+    "mustMention": ["Champions", "7 wins out of 7 matches", "15 goals scored"]
+  },
+  {
+    "id": "group-f-table",
+    "question": "Show me the Group F table.",
+    "expectedChunkIds": ["group-f"],
+    "mustMention": ["Portugal", "Turkiye", "Georgia", "Czechia"]
+  },
+  {
+    "id": "venue-berlin",
+    "question": "Which matches were played in Berlin?",
+    "expectedChunkIds": ["venue-berlin"],
+    "mustMention": ["Spain 3–0 Croatia", "Netherlands 2–1 Turkiye", "Spain 2–1 England"]
+  },
+  {
+    "id": "most-yellow-cards",
+    "question": "Which team received the most yellow cards?",
+    "expectedChunkIds": ["leaderboard-yellow-cards"],
+    "mustMention": ["Turkiye", "19"]
+  },
+  {
+    "id": "goalless-draws",
+    "question": "Which matches ended 0–0?",
+    "expectedChunkIds": ["tournament-records"],
+    "mustMention": ["Netherlands 0–0 France", "Denmark 0–0 Serbia", "England 0–0 Slovenia", "Ukraine 0–0 Belgium", "Portugal 0–0 Slovenia"]
+  },
+  {
+    "id": "champion-path",
+    "question": "Who won Euro 2024 and what was their path to the title?",
+    "expectedChunkIds": ["tournament-overview", "team-spain"],
+    "mustMention": ["Spain", "Georgia", "Germany", "France", "England"]
+  },
+  {
+    "id": "tr-turkiye-performance",
+    "question": "Türkiye turnuvada nasıl bir performans gösterdi?",
+    "expectedChunkIds": ["team-turkiye", "group-f"],
+    "mustMention": ["Quarter-final", "3 wins", "Netherlands"]
+  },
+  {
+    "id": "tr-top-scorer-team",
+    "question": "Turnuvada en çok gol atan takım hangisi?",
+    "expectedChunkIds": ["leaderboard-goals-scored"],
+    "mustMention": ["Spain", "15"]
+  },
+  {
+    "id": "followup-group-stage",
+    "question": "And how did they do in the group stage?",
+    "history": [
+      { "role": "user", "content": "Who won Euro 2024?" },
+      { "role": "assistant", "content": "Spain won Euro 2024, beating England 2–1 in the final in Berlin." }
+    ],
+    "expectedChunkIds": ["group-b", "team-spain"],
+    "mustMention": ["Croatia", "Italy", "Albania", "9 points"]
+  },
+  {
+    "id": "followup-xg",
+    "question": "What was the xG in that match?",
+    "history": [
+      { "role": "user", "content": "How did Turkiye's tournament end?" },
+      { "role": "assistant", "content": "Turkiye lost 2–1 to the Netherlands in the quarter-final and were eliminated." }
+    ],
+    "expectedChunkIds": ["match-48"],
+    "mustMention": ["1.09", "1.31"]
+  },
+  {
+    "id": "unanswerable-final-scorers",
+    "question": "Who scored in the final?",
+    "answerable": false
+  }
+]
